@@ -5,7 +5,7 @@
 
 AOutlineBeaconClient::AOutlineBeaconClient()
 {
-
+	PlayerName = "Player";
 }
 
 void AOutlineBeaconClient::OnFailure()
@@ -33,6 +33,11 @@ void AOutlineBeaconClient::Client_OnLobbyUpdated_Implementation(FLobbyInfo Lobby
 	OnLobbyInfoUpdated.Broadcast(LobbyInfo);
 }
 
+void AOutlineBeaconClient::Client_OnChatMessageReceived_Implementation(const FText& Message)
+{
+	OnChatMessageRecieved.Broadcast(Message);
+}
+
 bool AOutlineBeaconClient::ConnectToServer(const FString& Address)
 {
 	FURL Destination = FURL(nullptr, *Address, TRAVEL_Absolute);
@@ -45,3 +50,32 @@ void AOutlineBeaconClient::LeaveLobby()
 	DestroyBeacon();
 }
 
+void AOutlineBeaconClient::SendChatMesssage(const FText& Message)
+{
+	Server_SendChatMessage(Message);
+}
+
+bool AOutlineBeaconClient::Server_SendChatMessage_Validate(const FText& Message)
+{
+	return true;
+}
+
+void AOutlineBeaconClient::Server_SendChatMessage_Implementation(const FText& Message)
+{
+	FString ChatMessage = PlayerName + ": " + Message.ToString();
+
+	if (AOutlineBeaconHostObject* Host = Cast<AOutlineBeaconHostObject>(BeaconOwner))
+	{
+		Host->SendMessageToLobbyChat(FText::FromString(ChatMessage));
+	}
+}
+
+void AOutlineBeaconClient::SetPlayerName(const FString& NewPlayerName)
+{
+	PlayerName = NewPlayerName;
+}
+
+FString AOutlineBeaconClient::GetPlayerName() const
+{
+	return PlayerName;
+}

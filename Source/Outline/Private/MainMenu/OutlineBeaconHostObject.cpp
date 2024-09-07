@@ -57,6 +57,11 @@ void AOutlineBeaconHostObject::OnClientConnected(AOnlineBeaconClient* NewClientA
 		PlayerName.Append(FString::FromInt(LobbyInfo.PlayerList.Num()));
 		LobbyInfo.PlayerList.Add(PlayerName);
 
+		if (AOutlineBeaconClient* OutlineClient = Cast<AOutlineBeaconClient>(NewClientActor))
+		{
+			OutlineClient->SetPlayerName(PlayerName);
+		}
+
 		OnHostLobbyInfoUpdated.Broadcast(LobbyInfo);
 
 		UE_LOG(LogTemp, Warning, L"CONNECTED CLIENT VALID");
@@ -97,4 +102,16 @@ void AOutlineBeaconHostObject::DisconnectClient(AOnlineBeaconClient* ClientActor
 FLobbyInfo AOutlineBeaconHostObject::GetLobbyInfo() const
 {
 	return LobbyInfo;
+}
+
+void AOutlineBeaconHostObject::SendMessageToLobbyChat(const FText& ChatMessage)
+{
+	OnHostChatMessageRecieved.Broadcast(ChatMessage);
+	for (AOnlineBeaconClient* ClientBeacon : ClientActors)
+	{
+		if (AOutlineBeaconClient* Client = Cast<AOutlineBeaconClient>(ClientBeacon))
+		{
+			Client->Client_OnChatMessageReceived(ChatMessage);
+		}
+	}
 }

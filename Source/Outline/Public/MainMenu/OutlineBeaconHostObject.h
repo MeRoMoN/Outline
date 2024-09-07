@@ -20,6 +20,7 @@ struct FLobbyInfo
 
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHostLobbyInfoUpdated, FLobbyInfo, LobbyInfo);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHostChatMessageRecieved, const FText&, Message);
 
 
 UCLASS()
@@ -35,6 +36,9 @@ protected:
 
 	UPROPERTY(BlueprintAssignable)
 	FOnHostLobbyInfoUpdated OnHostLobbyInfoUpdated;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnHostChatMessageRecieved OnHostChatMessageRecieved;
 
 	UFUNCTION(BlueprintCallable)
 	void UpdateLobbyInfo(FLobbyInfo NewLobbyInfo);
@@ -60,4 +64,7 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	FLobbyInfo GetLobbyInfo() const;
+
+	UFUNCTION(BlueprintCallable)
+	void SendMessageToLobbyChat(const FText& ChatMessage);
 };
