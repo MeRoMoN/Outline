@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "OnlineBeaconHostObject.h"
+#include "Http.h"
 #include "OutlineBeaconHostObject.generated.h"
 
 USTRUCT(BlueprintType)
@@ -46,7 +47,10 @@ protected:
 
 	FLobbyInfo LobbyInfo;
 
+	FHttpModule* Http;
+	int ServerID;
 
+	void OnProcessRequestComplete(FHttpRequestPtr Request, FHttpResponsePtr Response, bool Success);
 	void UpdateClientLobbyInfo();
 	virtual void BeginPlay() override;
 
@@ -58,6 +62,9 @@ private:
 	virtual void OnClientConnected(AOnlineBeaconClient* NewClientActor, UNetConnection* ClientConnection) override;
 	virtual void NotifyClientDisconnected(AOnlineBeaconClient* LeavingClientActor) override;
 	virtual void DisconnectClient(AOnlineBeaconClient* ClientActor) override;
+
+	void PostServerEntry();
+	void DeleteServerEntry();
 
 
 public:

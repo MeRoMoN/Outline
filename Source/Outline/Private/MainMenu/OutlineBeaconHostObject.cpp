@@ -10,12 +10,28 @@ AOutlineBeaconHostObject::AOutlineBeaconHostObject()
 {
 	ClientBeaconActorClass = AOutlineBeaconClient::StaticClass();
 	BeaconTypeName = ClientBeaconActorClass->GetName();
+
+	Http = &FHttpModule::Get();
+	ServerID = -1;
 }
 
 void AOutlineBeaconHostObject::UpdateLobbyInfo(FLobbyInfo NewLobbyInfo)
 {
 	LobbyInfo.MapImage = NewLobbyInfo.MapImage;
 	UpdateClientLobbyInfo();
+}
+
+void AOutlineBeaconHostObject::OnProcessRequestComplete(FHttpRequestPtr Request, FHttpResponsePtr Response, bool Success)
+{
+	if (Success)
+	{
+		ServerID = FCString::Atoi(*Response->GetContentAsString());
+		UE_LOG(LogTemp, Warning, TEXT("HTTP Request Success: %d"), ServerID);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("HTTP Request FAILED"));
+	}
 }
 
 void AOutlineBeaconHostObject::UpdateClientLobbyInfo()
@@ -33,6 +49,8 @@ void AOutlineBeaconHostObject::BeginPlay()
 {
 	Super::BeginPlay();
 	LobbyInfo.PlayerList.Add(FString("Host Player"));
+
+	PostServerEntry();
 }
 
 void AOutlineBeaconHostObject::ShutdownServer()
@@ -45,6 +63,8 @@ void AOutlineBeaconHostObject::ShutdownServer()
 
 	UE_LOG(LogTemp, Warning, L"DISCONNECTING ALL CLIENTS");
 	Unregister();
+
+	DeleteServerEntry();
 }
 
 void AOutlineBeaconHostObject::OnClientConnected(AOnlineBeaconClient* NewClientActor, UNetConnection* ClientConnection)
@@ -96,6 +116,46 @@ void AOutlineBeaconHostObject::DisconnectClient(AOnlineBeaconClient* ClientActor
 		}
 
 		BeaconHost->DisconnectClient(ClientActor);
+	}
+}
+
+void AOutlineBeaconHostObject::PostServerEntry()
+{
+	TSharedPtr<FJsonObject> JsonObject = MakeShareable(new FJsonObject);
+	JsonObject->SetNumberField("ServerID", 0);
+	JsonObject->SetStringField("IPAddress", "127.0.0.1");
+	JsonObject->SetStringField("ServerName", "Test server");
+	JsonObject->SetStringField("MapName", "TestName");
+	JsonObject->SetNumberField("CurrentPlayers", 1);
+	JsonObject->SetNumberField("MaxPlayers", 5);
+
+	FString JsonString;
+	TSharedRef<TJsonWriter<TCHAR>> JsonWriter = TJsonWriterFactory<>::Create(&JsonString);
+	FJsonSerializer::Serialize(JsonObject.ToSharedRef(), JsonWriter);
+
+	TSharedRef<IHttpRequest> Request = Http->CreateRequest();
+
+	Request->OnProcessRequestComplete().BindUObject(this, &AOutlineBeaconHostObject::OnProcessRequestComplete);
+
+	Request->SetURL("https://localhost:44349/api/Host");
+	Request->SetVerb("POST");
+	Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
+	Request->SetContentAsString(JsonString);
+
+	Request->ProcessRequest();
+}
+
+void AOutlineBeaconHostObject::DeleteServerEntry()
+{
+	if (ServerID != -1)
+	{
+		TSharedRef<IHttpRequest> Request = Http->CreateRequest();
+
+		Request->SetURL("https://localhost:44349/api/Host/" + FString::FromInt(ServerID));
+		Request->SetVerb("DELETE");
+		Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));;
+
+		Request->ProcessRequest();
 	}
 }
 
