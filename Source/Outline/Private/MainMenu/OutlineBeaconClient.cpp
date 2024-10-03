@@ -45,6 +45,15 @@ bool AOutlineBeaconClient::ConnectToServer(const FString& Address)
 	return InitClient(Destination);
 }
 
+void AOutlineBeaconClient::ConnectToGame(const FString& Address)
+{
+	if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+	{
+		PC->ClientTravel(Address, ETravelType::TRAVEL_Absolute);
+	}
+	LeaveLobby();
+}
+
 void AOutlineBeaconClient::LeaveLobby()
 {
 	DestroyBeacon();
@@ -68,6 +77,11 @@ void AOutlineBeaconClient::Server_SendChatMessage_Implementation(const FText& Me
 	{
 		Host->SendMessageToLobbyChat(FText::FromString(ChatMessage));
 	}
+}
+
+void AOutlineBeaconClient::Client_ConnectToGame_Implementation()
+{
+	OnConnectedToGame.Broadcast();
 }
 
 void AOutlineBeaconClient::SetPlayerName(const FString& NewPlayerName)

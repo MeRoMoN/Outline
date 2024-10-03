@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "OnlineBeaconHostObject.h"
 #include "Http.h"
+#include "Outline/Public/Game/OutlineGameInstanceBase.h"
 #include "OutlineBeaconHostObject.generated.h"
 
 USTRUCT(BlueprintType)
@@ -44,9 +45,17 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	void UpdateLobbyInfo(FLobbyInfo NewLobbyInfo);
 
+	UFUNCTION(BlueprintCallable)
+	int GetCurrentPlayerCount();
+
+	UFUNCTION(BlueprintCallable)
+	void SetServerData(FServerData NewServerData);
+
+	UFUNCTION(BlueprintCallable)
+	void StartServer(const FString& MapURL);
 
 	FLobbyInfo LobbyInfo;
-
+	FServerData ServerData;
 	FHttpModule* Http;
 	int ServerID;
 
@@ -59,11 +68,17 @@ private:
 	UFUNCTION(BlueprintCallable)
 	void ShutdownServer();
 
+	UFUNCTION(BlueprintCallable)
+	void PostServerEntry();
+
+	UFUNCTION(BlueprintCallable)
+	void UpdateServerEntry();
+
+
 	virtual void OnClientConnected(AOnlineBeaconClient* NewClientActor, UNetConnection* ClientConnection) override;
 	virtual void NotifyClientDisconnected(AOnlineBeaconClient* LeavingClientActor) override;
 	virtual void DisconnectClient(AOnlineBeaconClient* ClientActor) override;
 
-	void PostServerEntry();
 	void DeleteServerEntry();
 
 

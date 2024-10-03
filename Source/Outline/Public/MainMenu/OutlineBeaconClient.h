@@ -12,6 +12,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLobbyInfoUpdated, FLobbyInfo, Lob
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnConnectedToHost, bool, Connected);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnChatMessageRecieved, const FText&, Message);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDisconnected);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnConnectedToGame);
 
 UCLASS()
 class OUTLINE_API AOutlineBeaconClient : public AOnlineBeaconClient
@@ -35,6 +36,9 @@ public:
 	UPROPERTY(BlueprintAssignable)
 	FOnChatMessageRecieved OnChatMessageRecieved;
 
+	UPROPERTY(BlueprintAssignable)
+	FOnConnectedToGame OnConnectedToGame;
+
 private:
 
 	virtual void OnFailure() override;
@@ -46,6 +50,9 @@ protected:
 
 	UFUNCTION(BlueprintCallable)
 	bool ConnectToServer(const FString& Address);
+
+	UFUNCTION(BlueprintCallable)
+	void ConnectToGame(const FString& Address);
 
 	UFUNCTION(BlueprintCallable)
 	void LeaveLobby();
@@ -71,6 +78,10 @@ public:
 	UFUNCTION(Client, Reliable)
 	void Client_OnChatMessageReceived(const FText& Message);
 	void Client_OnChatMessageReceived_Implementation(const FText& Message);
+
+	UFUNCTION(Client, Reliable)
+	void Client_ConnectToGame();
+	virtual void Client_ConnectToGame_Implementation();
 
 	void SetPlayerName(const FString& NewPlayerName);
 	FString GetPlayerName() const;

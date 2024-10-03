@@ -49,8 +49,6 @@ void AOutlineBeaconHostObject::BeginPlay()
 {
 	Super::BeginPlay();
 	LobbyInfo.PlayerList.Add(FString("Host Player"));
-
-	PostServerEntry();
 }
 
 void AOutlineBeaconHostObject::ShutdownServer()
@@ -71,21 +69,27 @@ void AOutlineBeaconHostObject::OnClientConnected(AOnlineBeaconClient* NewClientA
 {
 	Super::OnClientConnected(NewClientActor, ClientConnection);
 	
-	if (NewClientActor)
+	if (AOutlineBeaconClient* OutlineClient = Cast<AOutlineBeaconClient>(NewClientActor))
 	{
+		if (LobbyInfo.PlayerList.Num() >= ServerData.MaxPlayers)
+		{
+			LobbyInfo.PlayerList.Add(FString());
+			DisconnectClient(OutlineClient);
+			return;
+		}
+
 		FString PlayerName = FString("Player ");
 		PlayerName.Append(FString::FromInt(LobbyInfo.PlayerList.Num()));
 		LobbyInfo.PlayerList.Add(PlayerName);
+		ServerData.CurrentPlayers = LobbyInfo.PlayerList.Num();
 
-		if (AOutlineBeaconClient* OutlineClient = Cast<AOutlineBeaconClient>(NewClientActor))
-		{
-			OutlineClient->SetPlayerName(PlayerName);
-		}
+		OutlineClient->SetPlayerName(PlayerName);
 
 		OnHostLobbyInfoUpdated.Broadcast(LobbyInfo);
 
 		UE_LOG(LogTemp, Warning, L"CONNECTED CLIENT VALID");
 		UpdateClientLobbyInfo();
+		UpdateServerEntry();
 	}
 	else
 	{
@@ -99,9 +103,11 @@ void AOutlineBeaconHostObject::NotifyClientDisconnected(AOnlineBeaconClient* Lea
 	UE_LOG(LogTemp, Warning, L"CLIENT HAS DISCONNECTED");
 
 	LobbyInfo.PlayerList.Pop(true);
+	ServerData.CurrentPlayers = LobbyInfo.PlayerList.Num();
 	
 	OnHostLobbyInfoUpdated.Broadcast(LobbyInfo);
 	UpdateClientLobbyInfo();
+	UpdateServerEntry();
 }
 
 void AOutlineBeaconHostObject::DisconnectClient(AOnlineBeaconClient* ClientActor)
@@ -122,12 +128,12 @@ void AOutlineBeaconHostObject::DisconnectClient(AOnlineBeaconClient* ClientActor
 void AOutlineBeaconHostObject::PostServerEntry()
 {
 	TSharedPtr<FJsonObject> JsonObject = MakeShareable(new FJsonObject);
-	JsonObject->SetNumberField("ServerID", 0);
-	JsonObject->SetStringField("IPAddress", "127.0.0.1");
-	JsonObject->SetStringField("ServerName", "Test server");
-	JsonObject->SetStringField("MapName", "TestName");
-	JsonObject->SetNumberField("CurrentPlayers", 1);
-	JsonObject->SetNumberField("MaxPlayers", 5);
+	JsonObject->SetNumberField("ServerID", ServerData.ServerID);
+	JsonObject->SetStringField("IPAddress", ServerData.IPAddress);
+	JsonObject->SetStringField("ServerName", ServerData.ServerName);
+	JsonObject->SetStringField("MapName", ServerData.MapName);
+	JsonObject->SetNumberField("CurrentPlayers", ServerData.CurrentPlayers);
+	JsonObject->SetNumberField("MaxPlayers", ServerData.MaxPlayers);
 
 	FString JsonString;
 	TSharedRef<TJsonWriter<TCHAR>> JsonWriter = TJsonWriterFactory<>::Create(&JsonString);
@@ -143,6 +149,57 @@ void AOutlineBeaconHostObject::PostServerEntry()
 	Request->SetContentAsString(JsonString);
 
 	Request->ProcessRequest();
+}
+
+void AOutlineBeaconHostObject::UpdateServerEntry()
+{
+	TSharedPtr<FJsonObject> JsonObject = MakeShareable(new FJsonObject);
+	JsonObject->SetNumberField("ServerID", ServerData.ServerID);
+	JsonObject->SetStringField("IPAddress", ServerData.IPAddress);
+	JsonObject->SetStringField("ServerName", ServerData.ServerName);
+	JsonObject->SetStringField("MapName", ServerData.MapName);
+	JsonObject->SetNumberField("CurrentPlayers", ServerData.CurrentPlayers);
+	JsonObject->SetNumberField("MaxPlayers", ServerData.MaxPlayers);
+
+	FString JsonString;
+	TSharedRef<TJsonWriter<TCHAR>> JsonWriter = TJsonWriterFactory<>::Create(&JsonString);
+	FJsonSerializer::Serialize(JsonObject.ToSharedRef(), JsonWriter);
+
+	TSharedRef<IHttpRequest> Request = Http->CreateRequest();
+
+	Request->OnProcessRequestComplete().BindUObject(this, &AOutlineBeaconHostObject::OnProcessRequestComplete);
+
+	Request->SetURL("https://localhost:44349/api/Host/1");
+	Request->SetVerb("PUT");
+	Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
+	Request->SetContentAsString(JsonString);
+
+	Request->ProcessRequest();
+}
+
+int AOutlineBeaconHostObject::GetCurrentPlayerCount()
+{
+	return LobbyInfo.PlayerList.Num();
+}
+
+void AOutlineBeaconHostObject::SetServerData(FServerData NewServerData)
+{
+	ServerData = NewServerData;
+	ServerData.CurrentPlayers = LobbyInfo.PlayerList.Num();
+}
+
+void AOutlineBeaconHostObject::StartServer(const FString& MapURL)
+{
+	for (AOnlineBeaconClient* ClientBeacon : ClientActors)
+	{
+		if (AOutlineBeaconClient* Client = Cast<AOutlineBeaconClient>(ClientBeacon))
+		{
+			Client->Client_ConnectToGame();
+		}
+	}
+
+	ShutdownServer();
+	GetWorld()->ServerTravel(MapURL + "?listen");
 }
 
 void AOutlineBeaconHostObject::DeleteServerEntry()
