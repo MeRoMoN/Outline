@@ -12,6 +12,9 @@ class UCameraComponent;
 class UInputAction;
 class UInputMappingContext;
 struct FInputActionValue;
+class AInteractableBase; 
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInteractableHit, AInteractableBase*, InteractableObject);
 
 UCLASS()
 class OUTLINE_API ACharacterBase : public ACharacter
@@ -19,6 +22,9 @@ class OUTLINE_API ACharacterBase : public ACharacter
 	GENERATED_BODY()
 
 public:
+
+	UPROPERTY(BlueprintAssignable, Category = "Interaction")
+	FOnInteractableHit OnInteractableHit;
 
 	ACharacterBase();
 
@@ -36,8 +42,21 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* MoveAction;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* InteractAction;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interaction")
+	float InteractRate;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interaction")
+	float InteractRange;
+
+
+	FTimerHandle InteractTimerHandle;
+	AInteractableBase* InteractableObject;
 
 protected:
+
 	virtual void BeginPlay();
 
 public:
@@ -46,10 +65,16 @@ public:
 	class UInputAction* LookAction;
 
 protected:
+	
+	UFUNCTION(Server, unreliable)
+	void Server_Interact();
+	void Server_Interact_Implementation();
 
 	void Move(const FInputActionValue& Value);
-
 	void Look(const FInputActionValue& Value);
+
+	void PerformInteractionTrace();
+	void Interact();
 
 protected:
 
@@ -58,7 +83,6 @@ protected:
 public:
 
 	USkeletalMeshComponent* GetMesh1P() const { return Mesh1P; }
-	
 	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }
 
 };

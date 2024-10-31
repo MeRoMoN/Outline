@@ -11,6 +11,9 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "Engine/LocalPlayer.h"
+#include "TimerManager.h"
+#include "Engine/World.h"
+#include "Interactables/InteractableBase.h"
 
 
 ACharacterBase::ACharacterBase()
@@ -30,12 +33,17 @@ ACharacterBase::ACharacterBase()
 	//Mesh1P->SetRelativeRotation(FRotator(0.9f, -19.19f, 5.2f));
 	Mesh1P->SetRelativeLocation(FVector(-30.f, 0.f, -150.f));
 
+	InteractableObject = nullptr;
+	InteractRate = 0.2f;
+	InteractRange = 300.f;
 }
 
 void ACharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
 	
+	if(GetLocalRole() != ENetRole::ROLE_SimulatedProxy)
+		GetWorld()->GetTimerManager().SetTimer(InteractTimerHandle, this, &ACharacterBase::PerformInteractionTrace, InteractRate,true);	
 }
 
 void ACharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -52,6 +60,19 @@ void ACharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ACharacterBase::Look);
+
+		// Interacting
+		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &ACharacterBase::Interact);
+	}
+}
+
+void ACharacterBase::Server_Interact_Implementation()
+{
+	UE_LOG(LogTemp, Warning, TEXT("Server_Interact"));
+	PerformInteractionTrace();
+	if (InteractableObject)
+	{
+		InteractableObject->Use(this);
 	}
 }
 
@@ -78,6 +99,49 @@ void ACharacterBase::Look(const FInputActionValue& Value)
 		// add yaw and pitch input to controller
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(LookAxisVector.Y);
+	}
+}
+
+void ACharacterBase::PerformInteractionTrace()
+{
+	FVector Start = FirstPersonCameraComponent->GetComponentLocation();
+	FVector Rot = GetBaseAimRotation().Vector();
+	FVector End = Start + Rot * InteractRange;
+
+	FHitResult HitResult;
+	FCollisionObjectQueryParams CollisionQuery;
+	FCollisionQueryParams CollisionParams;
+	CollisionParams.AddIgnoredActor(this);
+
+	GetWorld()->LineTraceSingleByObjectType(HitResult, Start, End, CollisionQuery, CollisionParams);
+
+	if (AInteractableBase* HitInteractable = Cast<AInteractableBase>(HitResult.GetActor()))
+	{
+		if (InteractableObject == nullptr)
+		{
+			InteractableObject = HitInteractable;
+			UE_LOG(LogTemp, Warning, TEXT("HIT ACTOR %s"), *HitResult.GetActor()->GetName());
+			OnInteractableHit.Broadcast(InteractableObject);
+		}
+	}
+	else if(InteractableObject)
+	{
+		InteractableObject = nullptr;
+		UE_LOG(LogTemp, Warning, TEXT("THERE'S NOTHING IMPORTANT TO INTERACT WITH"));
+		OnInteractableHit.Broadcast(nullptr);
+	}
+}
+
+void ACharacterBase::Interact()
+{
+	UE_LOG(LogTemp, Warning, TEXT("INTERACT"));
+
+	if (InteractableObject)
+	{
+		if(HasAuthority())
+			InteractableObject->Use(this);
+		else
+			Server_Interact();
 	}
 }
 
